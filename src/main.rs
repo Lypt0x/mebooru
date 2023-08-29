@@ -1,23 +1,34 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use gelbooru_api::{Client as GClient, posts};
 use gelbooru_api::api::{Post, PostQuery};
 use hyper::Client;
 use hyper::client::HttpConnector;
 use hyper_rustls::HttpsConnector;
 
+use clap::Parser;
+use clap_num::number_range;
+
+#[derive(Parser, Debug)]
+#[command(arg_required_else_help = true)]
+struct ProgramArgs {
+    /// Destination folder to store scraped Gelbooru images
+    #[arg(short, long, required = true)]
+    destination: PathBuf,
+
+    /// Tags to search f or at Gelbooru
+    #[arg(num_args(0..), short, long, required = true)]
+    tags: Vec<String>,
+
+    /// How many entries it should scrape for
+    #[arg(short, long, default_value_t = 100, value_parser = leq_100)]
+    limit: u8
+}
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 20)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let folder: String = std::env::args().nth(1).expect("Please provide a destination folder path.");
-    if !Path::new(&folder).is_dir() {
-        return Err("Please provide a valid path.".into());
-    }
-
-    let tags: Vec<String> = std::env::args().skip(2).collect();
-    if tags.is_empty() {
-        return Err(format!(
-            "Usage: {} <dest-folder-path> <tags separated with space>",
-            std::env::args().nth(0).unwrap(),
-        ).into());
+    let ProgramArgs { destination, tags, limit } = ProgramArgs::parse();
+    if !destination.is_dir() {
+        return Err("Please specify a valid destination folder.".into());
     }
 
     let client = GClient::public();
@@ -26,7 +37,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for tag in tags { request = request.tag(tag); }
 
     println!("Fetching Information.. ⏳");
-    let PostQuery { posts, .. } = request.send(&client).await?;
+    let PostQuery { posts, .. } = request
+        .limit(limit as usize)
+        .send(&client).await?;
     let connector = hyper_rustls::HttpsConnectorBuilder::new()
         .with_native_roots().https_only()
         .enable_http1().build();
@@ -35,19 +48,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let length = posts.len();
     for (idx, post) in posts.into_iter().enumerate() {
         tokio_scoped::scope(|scope| {
-            print!("[{idx} of {length}] ");
+            print!("[{idx} of {length}] ", idx = idx+1);
             scope.spawn(async {
                 deploy(
                     http_client.clone(),
                     post,
-                    &folder
+                    destination.to_str().unwrap()
                 ).await
                     .unwrap()
             });
         });
     }
 
-    Ok(println!("Downloaded at folder `{folder}`. ✅"))
+    Ok(println!(
+        "Downloaded at folder `{destination}`. ✅",
+        destination = destination.to_str().unwrap()
+    ))
 }
 
 async fn deploy(client: Client<HttpsConnector<HttpConnector>>, post: Post, folder: impl AsRef<str>) -> Result<(), Box<dyn std::error::Error>> {
@@ -66,4 +82,8 @@ async fn deploy(client: Client<HttpsConnector<HttpConnector>>, post: Post, folde
         Path::new(&std::format!("{folder}/{image}")),
         contents
     ).await.map_err(Into::into)
+}
+
+fn leq_100(s: &str) -> Result<u8, String> {
+    number_range(s, 0, 100)
 }
