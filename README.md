@@ -43,19 +43,20 @@ This will compile the project and create an executable binary in the `target/rel
 
 ## Usage
 
-Mebooru requires a destination folder path and one or more tags to specify the images you want to download. To use Mebooru, follow this usage pattern:
+Mebooru requires several command-line arguments to function properly:
 
 ```bash
-./target/release/mebooru <dest-folder-path> <tags separated with space>
+./target/release/mebooru --destination <dest-folder-path> --tags <tags separated with space> [--limit <limit>]
 ```
 
-- `<dest-folder-path>`: The path to the directory where you want to save the downloaded images.
-- `<tags separated with space>`: One or more tags that describe the images you want to download. Separate multiple tags with spaces.
+- `--destination <dest-folder-path>`: The path to the directory where you want to save the downloaded images.
+- `--tags <tags separated with space>`: One or more tags that describe the images you want to download. Separate multiple tags with spaces.
+- `--limit <limit>`: The maximum number of entries to scrape for (default is 100).
 
-For example, to download images tagged with "cat" and "cute" and save them to the "images" folder:
+For example, to download up to 50 images tagged with "cat" and "cute" and save them to the "images" folder:
 
 ```bash
-./target/release/mebooru images cat cute
+./target/release/mebooru  --limit 50 --destination images --tags cat cute
 ```
 
 ## Contributing
@@ -64,6 +65,7 @@ Contributions to Mebooru are welcome! If you find any issues or would like to ad
 ## License
 
 This project is licensed under the [GNU General Public License](LICENSE). You are free to use, modify, and distribute this software as per the terms of the license.
+For more information, please see the [LICENSE.md](LICENSE) file.
 
 ---
 
